@@ -11,12 +11,12 @@ jobs:
     steps:
       - name: Criar projeto Android
         run: |
-          mkdir -p app/src/main/java/com/painelgps
+          mkdir -p app/src/main/java/com/velocimetrogps
 
           cat > settings.gradle <<'EOF'
           pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }
           dependencyResolutionManagement { repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS); repositories { google(); mavenCentral() } }
-          rootProject.name='PainelGPS'
+          rootProject.name='VelocimetroGPS'
           include ':app'
           EOF
 
@@ -30,15 +30,15 @@ jobs:
           plugins { id 'com.android.application' }
 
           android {
-              namespace 'com.painelgps'
+              namespace 'com.velocimetrogps'
               compileSdk 35
 
               defaultConfig {
-                  applicationId 'com.painelgps'
+                  applicationId 'com.velocimetrogps'
                   minSdk 23
                   targetSdk 35
-                  versionCode 2
-                  versionName '2.0'
+                  versionCode 3
+                  versionName '3.0'
               }
           }
           EOF
@@ -47,7 +47,7 @@ jobs:
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
               <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
               <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
-              <application android:theme="@style/AppTheme" android:label="Painel GPS">
+              <application android:theme="@style/AppTheme" android:label="Velocímetro GPS">
                   <activity android:name=".MainActivity" android:screenOrientation="portrait" android:exported="true">
                       <intent-filter>
                           <action android:name="android.intent.action.MAIN"/>
@@ -68,15 +68,17 @@ jobs:
           </resources>
           EOF
 
-          cat > app/src/main/java/com/painelgps/MainActivity.java <<'EOF'
-          package com.painelgps;
+          cat > app/src/main/java/com/velocimetrogps/MainActivity.java <<'EOF'
+          package com.velocimetrogps;
 
           import android.Manifest;
           import android.app.Activity;
-          import android.os.*;
-          import android.location.*;
+          import android.os.Bundle;
+          import android.location.Location;
+          import android.location.LocationManager;
           import android.graphics.*;
-          import android.view.*;
+          import android.view.MotionEvent;
+          import android.view.View;
           import java.text.DecimalFormat;
 
           public class MainActivity extends Activity {
@@ -87,13 +89,14 @@ jobs:
               long start;
               DecimalFormat df = new DecimalFormat("0.0");
 
+              @Override
               public void onCreate(Bundle b) {
                   super.onCreate(b);
                   start = System.currentTimeMillis();
                   dash = new DashboardView(this);
                   setContentView(dash);
 
-                  if (Build.VERSION.SDK_INT >= 23) {
+                  if (android.os.Build.VERSION.SDK_INT >= 23) {
                       requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, 1);
                   }
 
@@ -104,7 +107,7 @@ jobs:
                   lm = (LocationManager)getSystemService(LOCATION_SERVICE);
                   try {
                       lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000, 0, loc -> update(loc));
-                  } catch(Exception e) {}
+                  } catch (Exception e) {}
               }
 
               void update(Location loc) {
@@ -124,50 +127,59 @@ jobs:
                       setBackgroundColor(Color.BLACK);
                   }
 
+                  @Override
                   protected void onDraw(Canvas c) {
                       int w = getWidth();
                       int h = getHeight();
                       long sec = (System.currentTimeMillis() - start) / 1000;
                       double avg = sec > 0 ? distance / (sec / 3600.0) : 0;
 
+                      // fundo com gradiente
                       p.setShader(new LinearGradient(0, 0, w, h, 0xff02040a, 0xff001a33, Shader.TileMode.CLAMP));
                       c.drawRect(0, 0, w, h, p);
                       p.setShader(null);
 
+                      // título
                       p.setTextAlign(Paint.Align.CENTER);
                       p.setFakeBoldText(true);
                       p.setTextSize(42);
                       p.setColor(0xff00ccff);
                       p.setShadowLayer(20, 0, 0, 0xff00ccff);
-                      c.drawText("PAINEL GPS", w / 2, 80, p);
+                      c.drawText("Velocímetro GPS", w / 2, 115, p);
 
+                      // arco do velocímetro
                       p.setStyle(Paint.Style.STROKE);
                       p.setStrokeWidth(10);
-                      r.set(35, 125, w - 35, 530);
+                      r.set(45, 170, w - 45, 535);
                       p.setColor(0xff003366);
                       c.drawArc(r, 180, 180, false, p);
                       p.setColor(0xff00ccff);
-                      c.drawArc(r, 180, (float)Math.min(180, kmh / 200 * 180), false, p);
+                      float sweep = (float)Math.min(180.0, kmh / 200.0 * 180.0);
+                      c.drawArc(r, 180, sweep, false, p);
 
+                      // velocidade atual
                       p.setStyle(Paint.Style.FILL);
                       p.setTextSize(150);
                       p.setColor(0xff66eaff);
                       p.setShadowLayer(35, 0, 0, 0xff00ccff);
-                      c.drawText(String.valueOf(Math.round(kmh)), w / 2, 365, p);
+                      c.drawText(String.valueOf(Math.round(kmh)), w / 2, 400, p);
 
+                      // unidade
                       p.setTextSize(42);
-                      c.drawText("km/h", w / 2, 430, p);
+                      c.drawText("km/h", w / 2, 465, p);
                       p.clearShadowLayer();
 
+                      // cartões de dados
                       drawCard(c, 25, 560, w/2 - 15, 720, "DISTÂNCIA", df.format(distance) + " km", 0xff00ccff);
                       drawCard(c, w/2 + 15, 560, w - 25, 720, "MÉDIA", Math.round(avg) + " km/h", 0xff62ff6b);
                       drawCard(c, 25, 750, w/2 - 15, 910, "MÁXIMA", Math.round(max) + " km/h", 0xffffcc33);
                       drawCard(c, w/2 + 15, 750, w - 25, 910, "TEMPO", time(sec), 0xffff4fb3);
                       drawCard(c, 25, 940, w - 25, 1090, "PRECISÃO GPS", last == null ? "procurando..." : Math.round(last.getAccuracy()) + " m", 0xff9b5cff);
 
+                      // botão Zerar
                       p.setStyle(Paint.Style.FILL);
                       p.setColor(0xff1a1a1a);
-                      r.set(40, h - 120, w - 40, h - 45);
+                      r.set(40, h - 185, w - 40, h - 110);
                       c.drawRoundRect(r, 22, 22, p);
 
                       p.setStyle(Paint.Style.STROKE);
@@ -181,17 +193,20 @@ jobs:
                       p.setColor(0xffffffff);
                       p.setTextSize(34);
                       p.setTextAlign(Paint.Align.CENTER);
-                      c.drawText("ZERAR", w / 2, h - 72, p);
+                      c.drawText("ZERAR", w / 2, h - 137, p);
 
+                      // atualiza a cada segundo
                       postInvalidateDelayed(1000);
                   }
 
                   void drawCard(Canvas c, int l, int t, int rr, int b, String title, String val, int color) {
+                      // fundo do cartão
                       p.setStyle(Paint.Style.FILL);
                       p.setColor(0xcc050b14);
                       r.set(l, t, rr, b);
                       c.drawRoundRect(r, 22, 22, p);
 
+                      // borda
                       p.setStyle(Paint.Style.STROKE);
                       p.setStrokeWidth(4);
                       p.setColor(color);
@@ -199,6 +214,7 @@ jobs:
                       c.drawRoundRect(r, 22, 22, p);
                       p.clearShadowLayer();
 
+                      // título
                       p.setStyle(Paint.Style.FILL);
                       p.setTextAlign(Paint.Align.CENTER);
                       p.setColor(0xffffffff);
@@ -206,6 +222,7 @@ jobs:
                       p.setFakeBoldText(false);
                       c.drawText(title, (l + rr) / 2, t + 45, p);
 
+                      // valor
                       p.setColor(color);
                       p.setTextSize(38);
                       p.setFakeBoldText(true);
@@ -220,6 +237,7 @@ jobs:
                       return String.format("%02d:%02d:%02d", h, m, ss);
                   }
 
+                  @Override
                   public boolean onTouchEvent(MotionEvent e) {
                       if (e.getAction() == MotionEvent.ACTION_DOWN && e.getY() > getHeight() - 140) {
                           distance = 0;
@@ -254,5 +272,5 @@ jobs:
       - name: Enviar APK
         uses: actions/upload-artifact@v4
         with:
-          name: Painel-GPS-APK
+          name: Velocimetro-GPS-APK
           path: app/build/outputs/apk/debug/app-debug.apk
