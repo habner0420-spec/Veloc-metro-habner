@@ -1,0 +1,180 @@
+name: Build APK
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Criar projeto Android
+        run: |
+          mkdir -p app/src/main/java/com/painelgps
+
+          cat > settings.gradle <<'EOF'
+          pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }
+          dependencyResolutionManagement { repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS); repositories { google(); mavenCentral() } }
+          rootProject.name='PainelGPS'
+          include ':app'
+          EOF
+
+          cat > build.gradle <<'EOF'
+          plugins {
+              id 'com.android.application' version '8.7.3' apply false
+          }
+          EOF
+
+          cat > app/build.gradle <<'EOF'
+          plugins { id 'com.android.application' }
+
+          android {
+              namespace 'com.painelgps'
+              compileSdk 35
+
+              defaultConfig {
+                  applicationId 'com.painelgps'
+                  minSdk 23
+                  targetSdk 35
+                  versionCode 1
+                  versionName '1.0'
+              }
+          }
+          EOF
+
+          cat > app/src/main/AndroidManifest.xml <<'EOF'
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+              <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+              <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+              <application android:theme="@style/AppTheme" android:label="Painel GPS">
+                  <activity android:name=".MainActivity" android:screenOrientation="portrait" android:exported="true">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN"/>
+                          <category android:name="android.intent.category.LAUNCHER"/>
+                      </intent-filter>
+                  </activity>
+              </application>
+          </manifest>
+          EOF
+
+          mkdir -p app/src/main/res/values
+          cat > app/src/main/res/values/styles.xml <<'EOF'
+          <resources>
+              <style name="AppTheme" parent="android:style/Theme.Material.NoActionBar">
+                  <item name="android:windowFullscreen">true</item>
+                  <item name="android:fontFamily">sans</item>
+              </style>
+          </resources>
+          EOF
+
+          cat > app/src/main/java/com/painelgps/MainActivity.java <<'EOF'
+          package com.painelgps;
+
+          import android.Manifest;
+          import android.app.*;
+          import android.os.*;
+          import android.content.*;
+          import android.content.pm.PackageManager;
+          import android.location.*;
+          import android.view.*;
+          import android.widget.*;
+          import java.text.DecimalFormat;
+
+          public class MainActivity extends Activity {
+              TextView speed, info;
+              LocationManager lm;
+              Location last;
+              double distance = 0, max = 0;
+              long start;
+              boolean running = true;
+              DecimalFormat df = new DecimalFormat("0.0");
+
+              public void onCreate(Bundle b) {
+                  super.onCreate(b);
+                  start = System.currentTimeMillis();
+
+                  LinearLayout root = new LinearLayout(this);
+                  root.setOrientation(LinearLayout.VERTICAL);
+                  root.setGravity(Gravity.CENTER);
+                  root.setPadding(24,24,24,24);
+                  root.setBackgroundColor(0xff050505);
+
+                  speed = new TextView(this);
+                  speed.setText("0\nkm/h");
+                  speed.setTextColor(0xff00ccff);
+                  speed.setTextSize(72);
+                  speed.setGravity(Gravity.CENTER);
+
+                  info = new TextView(this);
+                  info.setTextColor(0xffffffff);
+                  info.setTextSize(22);
+                  info.setGravity(Gravity.CENTER);
+
+                  Button reset = new Button(this);
+                  reset.setText("ZERAR");
+                  reset.setOnClickListener(v -> {
+                      distance = 0; max = 0; last = null; start = System.currentTimeMillis();
+                  });
+
+                  root.addView(speed);
+                  root.addView(info);
+                  root.addView(reset);
+
+                  setContentView(root);
+
+                  if (Build.VERSION.SDK_INT >= 23) requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, 1);
+                  startGps();
+              }
+
+              void startGps() {
+                  lm = (LocationManager)getSystemService(LOCATION_SERVICE);
+                  try {
+                      lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000, 0, loc -> update(loc));
+                  } catch(Exception e) {
+                      speed.setText("GPS\nsem permissão");
+                  }
+              }
+
+              void update(Location loc) {
+                  double kmh = loc.hasSpeed() ? loc.getSpeed() * 3.6 : 0;
+                  if (kmh > max) max = kmh;
+
+                  if (last != null && running) distance += last.distanceTo(loc) / 1000.0;
+                  last = loc;
+
+                  long sec = (System.currentTimeMillis() - start) / 1000;
+                  double avg = sec > 0 ? distance / (sec / 3600.0) : 0;
+
+                  speed.setText(Math.round(kmh) + "\nkm/h");
+                  info.setText(
+                      "Distância: " + df.format(distance) + " km\n" +
+                      "Média: " + Math.round(avg) + " km/h\n" +
+                      "Máxima: " + Math.round(max) + " km/h\n" +
+                      "Precisão GPS: " + Math.round(loc.getAccuracy()) + " m"
+                  );
+              }
+          }
+          EOF
+
+      - name: Configurar Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Configurar Android
+        uses: android-actions/setup-android@v3
+
+      - name: Configurar Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.9
+
+      - name: Gerar APK
+        run: gradle assembleDebug
+
+      - name: Enviar APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Painel-GPS-APK
+          path: app/build/outputs/apk/debug/app-debug.apk
