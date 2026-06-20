@@ -2,6 +2,7 @@ name: Build APK
 
 on:
   workflow_dispatch:
+  push:
 
 jobs:
   build:
@@ -36,8 +37,8 @@ jobs:
                   applicationId 'com.painelgps'
                   minSdk 23
                   targetSdk 35
-                  versionCode 1
-                  versionName '1.0'
+                  versionCode 2
+                  versionName '2.0'
               }
           }
           EOF
@@ -69,155 +70,169 @@ jobs:
 
           cat > app/src/main/java/com/painelgps/MainActivity.java <<'EOF'
           package com.painelgps;
-package com.painelgps;
 
-import android.Manifest;
-import android.app.Activity;
-import android.os.*;
-import android.location.*;
-import android.graphics.*;
-import android.view.*;
-import android.content.pm.PackageManager;
-import java.text.DecimalFormat;
+          import android.Manifest;
+          import android.app.Activity;
+          import android.os.*;
+          import android.location.*;
+          import android.graphics.*;
+          import android.view.*;
+          import java.text.DecimalFormat;
 
-public class MainActivity extends Activity {
-    DashboardView dash;
-    LocationManager lm;
-    Location last;
-    double kmh = 0, distance = 0, max = 0;
-    long start;
-    DecimalFormat df = new DecimalFormat("0.0");
+          public class MainActivity extends Activity {
+              DashboardView dash;
+              LocationManager lm;
+              Location last;
+              double kmh = 0, distance = 0, max = 0;
+              long start;
+              DecimalFormat df = new DecimalFormat("0.0");
 
-    public void onCreate(Bundle b) {
-        super.onCreate(b);
-        start = System.currentTimeMillis();
-        dash = new DashboardView(this);
-        setContentView(dash);
+              public void onCreate(Bundle b) {
+                  super.onCreate(b);
+                  start = System.currentTimeMillis();
+                  dash = new DashboardView(this);
+                  setContentView(dash);
 
-        if (Build.VERSION.SDK_INT >= 23)
-            requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, 1);
+                  if (Build.VERSION.SDK_INT >= 23) {
+                      requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, 1);
+                  }
 
-        startGps();
-    }
+                  startGps();
+              }
 
-    void startGps() {
-        lm = (LocationManager)getSystemService(LOCATION_SERVICE);
-        try {
-            lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000, 0, loc -> update(loc));
-        } catch(Exception e) {}
-    }
+              void startGps() {
+                  lm = (LocationManager)getSystemService(LOCATION_SERVICE);
+                  try {
+                      lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000, 0, loc -> update(loc));
+                  } catch(Exception e) {}
+              }
 
-    void update(Location loc) {
-        kmh = loc.hasSpeed() ? loc.getSpeed() * 3.6 : 0;
-        if (kmh > max) max = kmh;
-        if (last != null) distance += last.distanceTo(loc) / 1000.0;
-        last = loc;
-        dash.invalidate();
-    }
+              void update(Location loc) {
+                  kmh = loc.hasSpeed() ? loc.getSpeed() * 3.6 : 0;
+                  if (kmh > max) max = kmh;
+                  if (last != null) distance += last.distanceTo(loc) / 1000.0;
+                  last = loc;
+                  dash.invalidate();
+              }
 
-    class DashboardView extends View {
-        Paint p = new Paint(1);
-        RectF r = new RectF();
+              class DashboardView extends View {
+                  Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
+                  RectF r = new RectF();
 
-        DashboardView(Activity a) { super(a); setBackgroundColor(Color.BLACK); }
+                  DashboardView(Activity a) {
+                      super(a);
+                      setBackgroundColor(Color.BLACK);
+                  }
 
-        protected void onDraw(Canvas c) {
-            int w = getWidth(), h = getHeight();
-            long sec = (System.currentTimeMillis() - start) / 1000;
-            double avg = sec > 0 ? distance / (sec / 3600.0) : 0;
+                  protected void onDraw(Canvas c) {
+                      int w = getWidth();
+                      int h = getHeight();
+                      long sec = (System.currentTimeMillis() - start) / 1000;
+                      double avg = sec > 0 ? distance / (sec / 3600.0) : 0;
 
-            p.setShader(new LinearGradient(0,0,w,h,0xff02040a,0xff001a33,Shader.TileMode.CLAMP));
-            c.drawRect(0,0,w,h,p);
-            p.setShader(null);
+                      p.setShader(new LinearGradient(0, 0, w, h, 0xff02040a, 0xff001a33, Shader.TileMode.CLAMP));
+                      c.drawRect(0, 0, w, h, p);
+                      p.setShader(null);
 
-            p.setColor(0xff00ccff);
-            p.setTextAlign(Paint.Align.CENTER);
-            p.setTextSize(42);
-            p.setFakeBoldText(true);
-            p.setShadowLayer(20,0,0,0xff00ccff);
-            c.drawText("PAINEL GPS", w/2, 80, p);
+                      p.setTextAlign(Paint.Align.CENTER);
+                      p.setFakeBoldText(true);
+                      p.setTextSize(42);
+                      p.setColor(0xff00ccff);
+                      p.setShadowLayer(20, 0, 0, 0xff00ccff);
+                      c.drawText("PAINEL GPS", w / 2, 80, p);
 
-            p.setStyle(Paint.Style.STROKE);
-            p.setStrokeWidth(8);
-            r.set(35,120,w-35,520);
-            p.setColor(0xff003366);
-            c.drawArc(r,180,180,false,p);
-            p.setColor(0xff00ccff);
-            c.drawArc(r,180,(float)Math.min(180, kmh/200*180),false,p);
+                      p.setStyle(Paint.Style.STROKE);
+                      p.setStrokeWidth(10);
+                      r.set(35, 125, w - 35, 530);
+                      p.setColor(0xff003366);
+                      c.drawArc(r, 180, 180, false, p);
+                      p.setColor(0xff00ccff);
+                      c.drawArc(r, 180, (float)Math.min(180, kmh / 200 * 180), false, p);
 
-            p.setStyle(Paint.Style.FILL);
-            p.setTextSize(145);
-            p.setColor(0xff66eaff);
-            p.setShadowLayer(35,0,0,0xff00ccff);
-            c.drawText(String.valueOf(Math.round(kmh)), w/2, 355, p);
+                      p.setStyle(Paint.Style.FILL);
+                      p.setTextSize(150);
+                      p.setColor(0xff66eaff);
+                      p.setShadowLayer(35, 0, 0, 0xff00ccff);
+                      c.drawText(String.valueOf(Math.round(kmh)), w / 2, 365, p);
 
-            p.setTextSize(42);
-            c.drawText("km/h", w/2, 420, p);
-            p.clearShadowLayer();
+                      p.setTextSize(42);
+                      c.drawText("km/h", w / 2, 430, p);
+                      p.clearShadowLayer();
 
-            drawCard(c, 25, 560, w/2-15, 720, "DISTÂNCIA", df.format(distance)+" km", 0xff00ccff);
-            drawCard(c, w/2+15, 560, w-25, 720, "MÉDIA", Math.round(avg)+" km/h", 0xff62ff6b);
-            drawCard(c, 25, 750, w/2-15, 910, "MÁXIMA", Math.round(max)+" km/h", 0xffffcc33);
-            drawCard(c, w/2+15, 750, w-25, 910, "TEMPO", time(sec), 0xffff4fb3);
+                      drawCard(c, 25, 560, w/2 - 15, 720, "DISTÂNCIA", df.format(distance) + " km", 0xff00ccff);
+                      drawCard(c, w/2 + 15, 560, w - 25, 720, "MÉDIA", Math.round(avg) + " km/h", 0xff62ff6b);
+                      drawCard(c, 25, 750, w/2 - 15, 910, "MÁXIMA", Math.round(max) + " km/h", 0xffffcc33);
+                      drawCard(c, w/2 + 15, 750, w - 25, 910, "TEMPO", time(sec), 0xffff4fb3);
+                      drawCard(c, 25, 940, w - 25, 1090, "PRECISÃO GPS", last == null ? "procurando..." : Math.round(last.getAccuracy()) + " m", 0xff9b5cff);
 
-            drawCard(c, 25, 940, w-25, 1090, "PRECISÃO GPS", last == null ? "procurando..." : Math.round(last.getAccuracy())+" m", 0xff9b5cff);
+                      p.setStyle(Paint.Style.FILL);
+                      p.setColor(0xff1a1a1a);
+                      r.set(40, h - 120, w - 40, h - 45);
+                      c.drawRoundRect(r, 22, 22, p);
 
-            p.setStyle(Paint.Style.FILL);
-            p.setColor(0xff1a1a1a);
-            r.set(40,h-120,w-40,h-45);
-            c.drawRoundRect(r,20,20,p);
-            p.setStyle(Paint.Style.STROKE);
-            p.setStrokeWidth(4);
-            p.setColor(0xffff4fb3);
-            c.drawRoundRect(r,20,20,p);
+                      p.setStyle(Paint.Style.STROKE);
+                      p.setStrokeWidth(4);
+                      p.setColor(0xffff4fb3);
+                      p.setShadowLayer(12, 0, 0, 0xffff4fb3);
+                      c.drawRoundRect(r, 22, 22, p);
+                      p.clearShadowLayer();
 
-            p.setStyle(Paint.Style.FILL);
-            p.setColor(0xffffffff);
-            p.setTextSize(34);
-            p.setTextAlign(Paint.Align.CENTER);
-            c.drawText("ZERAR", w/2, h-72, p);
-        }
+                      p.setStyle(Paint.Style.FILL);
+                      p.setColor(0xffffffff);
+                      p.setTextSize(34);
+                      p.setTextAlign(Paint.Align.CENTER);
+                      c.drawText("ZERAR", w / 2, h - 72, p);
 
-        void drawCard(Canvas c, int l, int t, int rr, int b, String title, String val, int color) {
-            p.setStyle(Paint.Style.FILL);
-            p.setColor(0xcc050b14);
-            r.set(l,t,rr,b);
-            c.drawRoundRect(r,22,22,p);
+                      postInvalidateDelayed(1000);
+                  }
 
-            p.setStyle(Paint.Style.STROKE);
-            p.setStrokeWidth(4);
-            p.setColor(color);
-            p.setShadowLayer(14,0,0,color);
-            c.drawRoundRect(r,22,22,p);
-            p.clearShadowLayer();
+                  void drawCard(Canvas c, int l, int t, int rr, int b, String title, String val, int color) {
+                      p.setStyle(Paint.Style.FILL);
+                      p.setColor(0xcc050b14);
+                      r.set(l, t, rr, b);
+                      c.drawRoundRect(r, 22, 22, p);
 
-            p.setStyle(Paint.Style.FILL);
-            p.setTextAlign(Paint.Align.CENTER);
-            p.setColor(0xffffffff);
-            p.setTextSize(24);
-            c.drawText(title, (l+rr)/2, t+45, p);
+                      p.setStyle(Paint.Style.STROKE);
+                      p.setStrokeWidth(4);
+                      p.setColor(color);
+                      p.setShadowLayer(14, 0, 0, color);
+                      c.drawRoundRect(r, 22, 22, p);
+                      p.clearShadowLayer();
 
-            p.setColor(color);
-            p.setTextSize(38);
-            p.setFakeBoldText(true);
-            c.drawText(val, (l+rr)/2, t+105, p);
-            p.setFakeBoldText(false);
-        }
+                      p.setStyle(Paint.Style.FILL);
+                      p.setTextAlign(Paint.Align.CENTER);
+                      p.setColor(0xffffffff);
+                      p.setTextSize(24);
+                      p.setFakeBoldText(false);
+                      c.drawText(title, (l + rr) / 2, t + 45, p);
 
-        String time(long s) {
-            long h=s/3600, m=(s%3600)/60, ss=s%60;
-            return String.format("%02d:%02d:%02d",h,m,ss);
-        }
+                      p.setColor(color);
+                      p.setTextSize(38);
+                      p.setFakeBoldText(true);
+                      c.drawText(val, (l + rr) / 2, t + 105, p);
+                      p.setFakeBoldText(false);
+                  }
 
-        public boolean onTouchEvent(android.view.MotionEvent e) {
-            if (e.getAction()==MotionEvent.ACTION_DOWN && e.getY()>getHeight()-140) {
-                distance = 0; max = 0; last = null; start = System.currentTimeMillis();
-                invalidate();
-            }
-            return true;
-        }
-    }
-}
+                  String time(long s) {
+                      long h = s / 3600;
+                      long m = (s % 3600) / 60;
+                      long ss = s % 60;
+                      return String.format("%02d:%02d:%02d", h, m, ss);
+                  }
+
+                  public boolean onTouchEvent(MotionEvent e) {
+                      if (e.getAction() == MotionEvent.ACTION_DOWN && e.getY() > getHeight() - 140) {
+                          distance = 0;
+                          max = 0;
+                          last = null;
+                          start = System.currentTimeMillis();
+                          invalidate();
+                      }
+                      return true;
+                  }
+              }
+          }
+          EOF
 
       - name: Configurar Java
         uses: actions/setup-java@v4
