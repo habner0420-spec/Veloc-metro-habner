@@ -172,7 +172,7 @@ jobs:
                       p.setColor(0xff888888);
                       p.setTextAlign(Paint.Align.CENTER);
                       p.setTextSize(28);
-                      c.drawText("Espaço de anúncio", w / 2, 485, p);
+                      c.drawText("Cannabner Corporation", w / 2, 485, p);
 
                       // cartões (3 linhas)
                       // Linha 1: Distância e Média
