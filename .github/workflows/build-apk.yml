@@ -16,7 +16,7 @@ jobs:
           cat > settings.gradle <<'EOF'
           pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }
           dependencyResolutionManagement { repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS); repositories { google(); mavenCentral() } }
-          rootProject.name='VelocimetroGPS'
+          rootProject.name='VelocimetroOffline'
           include ':app'
           EOF
 
@@ -37,8 +37,8 @@ jobs:
                   applicationId 'com.velocimetrogps'
                   minSdk 23
                   targetSdk 35
-                  versionCode 3
-                  versionName '3.0'
+                  versionCode 4
+                  versionName '4.0'
               }
           }
           EOF
@@ -47,7 +47,7 @@ jobs:
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
               <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
               <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
-              <application android:theme="@style/AppTheme" android:label="Velocímetro GPS">
+              <application android:theme="@style/AppTheme" android:label="Velocímetro Offline">
                   <activity android:name=".MainActivity" android:screenOrientation="portrait" android:exported="true">
                       <intent-filter>
                           <action android:name="android.intent.action.MAIN"/>
@@ -134,7 +134,7 @@ jobs:
                       long sec = (System.currentTimeMillis() - start) / 1000;
                       double avg = sec > 0 ? distance / (sec / 3600.0) : 0;
 
-                      // fundo com gradiente
+                      // fundo gradiente
                       p.setShader(new LinearGradient(0, 0, w, h, 0xff02040a, 0xff001a33, Shader.TileMode.CLAMP));
                       c.drawRect(0, 0, w, h, p);
                       p.setShader(null);
@@ -145,36 +145,44 @@ jobs:
                       p.setTextSize(42);
                       p.setColor(0xff00ccff);
                       p.setShadowLayer(20, 0, 0, 0xff00ccff);
-                      c.drawText("Velocímetro GPS", w / 2, 115, p);
+                      c.drawText("Velocímetro Offline", w / 2, 115, p);
 
-                      // arco do velocímetro
-                      p.setStyle(Paint.Style.STROKE);
-                      p.setStrokeWidth(10);
-                      r.set(45, 170, w - 45, 535);
-                      p.setColor(0xff003366);
-                      c.drawArc(r, 180, 180, false, p);
-                      p.setColor(0xff00ccff);
-                      float sweep = (float)Math.min(180.0, kmh / 200.0 * 180.0);
-                      c.drawArc(r, 180, sweep, false, p);
-
-                      // velocidade atual
+                      // número gigante
                       p.setStyle(Paint.Style.FILL);
-                      p.setTextSize(150);
+                      p.setTextSize(180);
                       p.setColor(0xff66eaff);
-                      p.setShadowLayer(35, 0, 0, 0xff00ccff);
-                      c.drawText(String.valueOf(Math.round(kmh)), w / 2, 400, p);
+                      p.setShadowLayer(40, 0, 0, 0xff00ccff);
+                      c.drawText(String.valueOf(Math.round(kmh)), w / 2, 350, p);
 
                       // unidade
-                      p.setTextSize(42);
-                      c.drawText("km/h", w / 2, 465, p);
+                      p.setTextSize(48);
+                      c.drawText("km/h", w / 2, 420, p);
                       p.clearShadowLayer();
 
-                      // cartões de dados
-                      drawCard(c, 25, 560, w/2 - 15, 720, "DISTÂNCIA", df.format(distance) + " km", 0xff00ccff);
-                      drawCard(c, w/2 + 15, 560, w - 25, 720, "MÉDIA", Math.round(avg) + " km/h", 0xff62ff6b);
-                      drawCard(c, 25, 750, w/2 - 15, 910, "MÁXIMA", Math.round(max) + " km/h", 0xffffcc33);
-                      drawCard(c, w/2 + 15, 750, w - 25, 910, "TEMPO", time(sec), 0xffff4fb3);
-                      drawCard(c, 25, 940, w - 25, 1090, "PRECISÃO GPS", last == null ? "procurando..." : Math.round(last.getAccuracy()) + " m", 0xff9b5cff);
+                      // área de anúncio reservada
+                      r.set(40, 450, w - 40, 510);
+                      p.setStyle(Paint.Style.FILL);
+                      p.setColor(0x23000000);
+                      c.drawRoundRect(r, 16, 16, p);
+                      p.setStyle(Paint.Style.STROKE);
+                      p.setStrokeWidth(2);
+                      p.setColor(0xff333333);
+                      c.drawRoundRect(r, 16, 16, p);
+                      p.setStyle(Paint.Style.FILL);
+                      p.setColor(0xff888888);
+                      p.setTextAlign(Paint.Align.CENTER);
+                      p.setTextSize(28);
+                      c.drawText("Espaço de anúncio", w / 2, 485, p);
+
+                      // cartões (3 linhas)
+                      // Linha 1: Distância e Média
+                      drawCard(c, 25, 520, w/2 - 15, 640, "DISTÂNCIA", df.format(distance) + " km", 0xff00ccff);
+                      drawCard(c, w/2 + 15, 520, w - 25, 640, "MÉDIA", Math.round(avg) + " km/h", 0xff62ff6b);
+                      // Linha 2: Máxima e Tempo
+                      drawCard(c, 25, 660, w/2 - 15, 780, "MÁXIMA", Math.round(max) + " km/h", 0xffffcc33);
+                      drawCard(c, w/2 + 15, 660, w - 25, 780, "TEMPO", time(sec), 0xffff4fb3);
+                      // Linha 3: Precisão (largura total)
+                      drawCard(c, 25, 800, w - 25, 920, "PRECISÃO", last == null ? "procurando..." : Math.round(last.getAccuracy()) + " m", 0xff9b5cff);
 
                       // botão Zerar
                       p.setStyle(Paint.Style.FILL);
@@ -195,18 +203,16 @@ jobs:
                       p.setTextAlign(Paint.Align.CENTER);
                       c.drawText("ZERAR", w / 2, h - 137, p);
 
-                      // atualiza a cada segundo
+                      // atualiza a tela a cada segundo
                       postInvalidateDelayed(1000);
                   }
 
                   void drawCard(Canvas c, int l, int t, int rr, int b, String title, String val, int color) {
-                      // fundo do cartão
                       p.setStyle(Paint.Style.FILL);
                       p.setColor(0xcc050b14);
                       r.set(l, t, rr, b);
                       c.drawRoundRect(r, 22, 22, p);
 
-                      // borda
                       p.setStyle(Paint.Style.STROKE);
                       p.setStrokeWidth(4);
                       p.setColor(color);
@@ -214,7 +220,6 @@ jobs:
                       c.drawRoundRect(r, 22, 22, p);
                       p.clearShadowLayer();
 
-                      // título
                       p.setStyle(Paint.Style.FILL);
                       p.setTextAlign(Paint.Align.CENTER);
                       p.setColor(0xffffffff);
@@ -222,7 +227,6 @@ jobs:
                       p.setFakeBoldText(false);
                       c.drawText(title, (l + rr) / 2, t + 45, p);
 
-                      // valor
                       p.setColor(color);
                       p.setTextSize(38);
                       p.setFakeBoldText(true);
@@ -272,5 +276,5 @@ jobs:
       - name: Enviar APK
         uses: actions/upload-artifact@v4
         with:
-          name: Velocimetro-GPS-APK
+          name: Velocimetro-Offline-APK
           path: app/build/outputs/apk/debug/app-debug.apk
